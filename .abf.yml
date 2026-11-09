@@ -1,2 +1,4 @@
 sources:
+  maven-jar-plugin-3.5.1.tar.gz: 57ca8086094d5c1e5131412f1389aecd28cad911
+removed_sources:
   maven-jar-plugin-2.4-source-release.zip: f2fa5b20cae2308029aeb92aad5221f185ccc136

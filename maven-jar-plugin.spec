@@ -1,139 +1,138 @@
-%{?_javapackages_macros:%_javapackages_macros}
-Name:           maven-jar-plugin
-Version:        2.4
-Release:        6.1%{?dist}
-Summary:        Maven JAR Plugin
+Name:		maven-jar-plugin
+Version:	3.5.1
+Release:	1
+Summary:	Builds a JAR from compiled classes and resources
+Group:		Development/Java
+License:	Apache-2.0
+URL:		https://maven.apache.org/plugins/maven-jar-plugin/
+Source0:	https://github.com/apache/maven-jar-plugin/archive/refs/tags/maven-jar-plugin-%{version}.tar.gz#/maven-jar-plugin-%{version}.tar.gz
+# The tag has no license file. This copy is in git, so the build does not
+# download it.
+Source1:	LICENSE-2.0.txt
+BuildArch:	noarch
+BuildRequires:	python
+BuildRequires:	maven
+BuildRequires:	maven-components >= 3.10.0
+BuildRequires:	java-current-devel
+# Generates META-INF/maven/plugin.xml. The separate annotations package
+# conflicts with maven-components on the same index file.
+BuildRequires:	maven-plugin-tools
+BuildRequires:	mvn(org.apache.maven.plugins:maven-plugin-plugin)
+BuildRequires:	mvn(org.apache.maven.shared:file-management)
+BuildRequires:	maven-file-management >= 1:3.2.0
+Requires:	maven-file-management >= 1:3.2.0
+BuildRequires:	mvn(org.apache.maven:maven-archiver)
+BuildRequires:	maven-archiver >= 3.6.6
+Requires:	maven-archiver >= 3.6.6
+BuildRequires:	mvn(org.codehaus.plexus:plexus-archiver)
+BuildRequires:	plexus-archiver >= 4.15.0
+Requires:	plexus-archiver >= 4.15.0
+BuildRequires:	mvn(commons-io:commons-io)
+BuildRequires:	apache-commons-io >= 1:2.22.0
+Requires:	apache-commons-io >= 1:2.22.0
+BuildRequires:	mvn(org.slf4j:slf4j-api)
+BuildRequires:	mvn(javax.inject:javax.inject)
+# javax.inject and jakarta-inject both provide this coordinate.
+BuildRequires:	javax.inject >= 1-2
+Requires:	javax.inject >= 1-2
+BuildRequires:	mvn(org.apache.maven:maven-plugin-api)
+BuildRequires:	mvn(org.apache.maven:maven-core)
+BuildRequires:	mvn(org.apache.maven:maven-artifact)
+BuildRequires:	mvn(org.apache.maven.plugin-tools:maven-plugin-annotations)
+BuildSystem:	maven
+BuildOption(install):	--file-name %{name}
 
-
-License:        ASL 2.0
-URL:            https://maven.apache.org/plugins/maven-jar-plugin/
-Source0:        http://repo2.maven.org/maven2/org/apache/maven/plugins/%{name}/%{version}/%{name}-%{version}-source-release.zip
-
-# Some classes from maven-artifact come in maven-core, added a dep in pom.xml
-Patch0:         %{name}-maven-core-dep.patch
-
-BuildArch: noarch
-
-BuildRequires: java-devel >= 1:1.6.0
-BuildRequires: javapackages-tools >= 0.7.0
-BuildRequires: maven-local
-BuildRequires: maven-plugin-plugin
-BuildRequires: maven-jar-plugin
-BuildRequires: maven-install-plugin
-BuildRequires: maven-resources-plugin
-BuildRequires: maven-compiler-plugin
-BuildRequires: maven-javadoc-plugin
-BuildRequires: maven-surefire-plugin
-BuildRequires: maven-surefire-provider-junit
-BuildRequires: maven-doxia-sitetools
-BuildRequires: maven-plugin-testing-harness
-BuildRequires: maven-archiver
-BuildRequires: plexus-archiver
-BuildRequires: apache-commons-lang
-BuildRequires: plexus-utils
-BuildRequires: junit
-Requires: maven
-Requires: maven-archiver
-Requires: plexus-archiver
-Requires: maven-archiver
-Requires: apache-commons-lang
-Requires: plexus-utils
-Requires: maven-plugin-testing-harness
-Requires: junit
-Requires: java
-
-Provides:       maven2-plugin-jar = %{version}-%{release}
-Obsoletes:      maven2-plugin-jar <= 0:2.0.8
+Obsoletes:	maven2-plugin-jar <= 0:2.0.8
+Provides:	maven2-plugin-jar = %{EVRD}
+Obsoletes:	maven-jar-plugin-javadoc < %{EVRD}
 
 %description
-Builds a Java Archive (JAR) file from the compiled
-project classes and resources.
-
-%package javadoc
-
-Summary:        Javadoc for %{name}
-Requires:       jpackage-utils
-
-%description javadoc
-API documentation for %{name}.
-
+Builds a JAR from the project's classes and resources, and can attach
+a test JAR. 3.5 writes the toolchain JDK into the manifest. 3.5.1
+updates plexus-archiver and commons-io. 4.0.0 is still a beta, so
+this package stays on 3.5.1. Tests need JUnit Jupiter, so they are
+not run.
 
 %prep
-%setup -q
-%patch0 -p1
+%autosetup -n maven-jar-plugin-maven-jar-plugin-%{version}
+rm -rf src/test src/it .github src/main/filtered-resources
+cp -p %{SOURCE1} LICENSE
+python - <<'PY'
+import xml.etree.ElementTree as ET
+NS = "http://maven.apache.org/POM/4.0.0"
+ET.register_namespace("", NS)
 
-#let plexus-container-default be retrieved as a dependency
-sed -i -e "s|plexus-container-default|plexus-container|g" pom.xml
+def tag(name):
+    return "{" + NS + "}" + name
 
-%build
-# Test class MockArtifact doesn't override method getMetadata
-mvn-rpmbuild install javadoc:aggregate -Dmaven.test.skip
+def add(parent, name, text):
+    node = ET.SubElement(parent, tag(name))
+    node.text = text
+    return node
 
-%install
-# jars
-install -d -m 0755 %{buildroot}%{_javadir}
-install -m 644 target/%{name}-%{version}.jar   %{buildroot}%{_javadir}/%{name}.jar
-
-# poms
-install -d -m 755 %{buildroot}%{_mavenpomdir}
-install -pm 644 pom.xml \
-    %{buildroot}%{_mavenpomdir}/JPP-%{name}.pom
-%add_maven_depmap JPP-%{name}.pom %{name}.jar
-
-# javadoc
-install -d -m 0755 %{buildroot}%{_javadocdir}/%{name}
-cp -pr target/site/api*/* %{buildroot}%{_javadocdir}/%{name}/
+root = ET.Element(tag("project"))
+add(root, "modelVersion", "4.0.0")
+add(root, "groupId", "org.apache.maven.plugins")
+add(root, "artifactId", "maven-jar-plugin")
+add(root, "version", "%{version}")
+add(root, "packaging", "maven-plugin")
+add(root, "name", "Apache Maven JAR Plugin")
+props = ET.SubElement(root, tag("properties"))
+add(props, "maven.compiler.release", "8")
+add(props, "project.build.sourceEncoding", "UTF-8")
+deps = ET.SubElement(root, tag("dependencies"))
+items = (
+    ("org.apache.maven.shared", "file-management", "3.2.0", None),
+    ("org.apache.maven", "maven-archiver", "3.6.6", None),
+    ("org.codehaus.plexus", "plexus-archiver", "4.15.0", None),
+    ("commons-io", "commons-io", "2.22.0", None),
+    ("org.slf4j", "slf4j-api", "1.7.36", None),
+    ("javax.inject", "javax.inject", "1", None),
+    ("org.apache.maven", "maven-plugin-api", "3.10.0", "provided"),
+    ("org.apache.maven", "maven-core", "3.10.0", "provided"),
+    ("org.apache.maven", "maven-artifact", "3.10.0", "provided"),
+    ("org.apache.maven.plugin-tools", "maven-plugin-annotations", "3.15.2", "provided"),
+)
+for group, artifact, version, scope in items:
+    dep = ET.SubElement(deps, tag("dependency"))
+    add(dep, "groupId", group)
+    add(dep, "artifactId", artifact)
+    add(dep, "version", version)
+    if scope:
+        add(dep, "scope", scope)
+build = ET.SubElement(root, tag("build"))
+plugins = ET.SubElement(build, tag("plugins"))
+plugin = ET.SubElement(plugins, tag("plugin"))
+add(plugin, "groupId", "org.apache.maven.plugins")
+add(plugin, "artifactId", "maven-plugin-plugin")
+# The lifecycle binding asks for 3.15.1. The packaged plugin is 3.16.0.
+add(plugin, "version", "3.16.0")
+ET.ElementTree(root).write("pom.xml", encoding="utf-8", xml_declaration=True)
+PY
+# Sisu loads @Named classes from this index. The indexer plugin is not packaged.
+python - <<'PY'
+import re
+from pathlib import Path
+root = Path("src/main/java")
+names = []
+for path in sorted(root.rglob("*.java")):
+    text = path.read_text(encoding="utf-8", errors="replace")
+    text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
+    text = re.sub(r"//.*?$", "", text, flags=re.M)
+    match = re.search(r"\b(?:class|interface|enum)\s+([A-Za-z0-9_]+)", text)
+    if not match:
+        continue
+    if "@Named" not in text[:match.start()]:
+        continue
+    pkg = re.search(r"(?m)^package\s+([A-Za-z0-9_.]+)\s*;", text)
+    if not pkg:
+        continue
+    names.append(pkg.group(1) + "." + match.group(1))
+if names:
+    dest = Path("src/main/resources/META-INF/sisu")
+    dest.mkdir(parents=True, exist_ok=True)
+    (dest / "javax.inject.Named").write_text("\n".join(names) + "\n", encoding="utf-8")
+PY
 
 %files -f .mfiles
-%doc LICENSE NOTICE
-
-%files javadoc
-%doc LICENSE NOTICE
-%{_javadocdir}/%{name}
-
-%changelog
-* Sat Aug 03 2013 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 2.4-6
-- Rebuilt for https://fedoraproject.org/wiki/Fedora_20_Mass_Rebuild
-
-* Thu Feb 14 2013 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 2.4-5
-- Rebuilt for https://fedoraproject.org/wiki/Fedora_19_Mass_Rebuild
-
-* Wed Feb 06 2013 Java SIG <java-devel@lists.fedoraproject.org> - 2.4-4
-- Update for https://fedoraproject.org/wiki/Fedora_19_Maven_Rebuild
-- Replace maven BuildRequires with maven-local
-
-* Tue Nov 13 2012 Stanislav Ochotnicky <sochotnicky@redhat.com> - 2.4-3
-- Install license files
-- Use generated maven file lists
-
-* Thu Jul 19 2012 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 2.4-2
-- Rebuilt for https://fedoraproject.org/wiki/Fedora_18_Mass_Rebuild
-
-* Wed Feb 15 2012 Alexander Kurtakov <akurtako@redhat.com> 2.4-1
-- Update to 2.4.0.
-
-* Fri Jan 13 2012 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 2.3.2-2
-- Rebuilt for https://fedoraproject.org/wiki/Fedora_17_Mass_Rebuild
-
-* Mon Sep 19 2011 Tomas Radej <tradej@redhat.com> - 2.3.2-1
-- Updated to 2.3.2
-
-* Fri Jun 17 2011 Alexander Kurtakov <akurtako@redhat.com> 2.3.1-3
-- Build with maven 3.
-
-* Tue Feb 08 2011 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 2.3.1-2
-- Rebuilt for https://fedoraproject.org/wiki/Fedora_15_Mass_Rebuild
-
-* Fri Sep 10 2010 Alexander Kurtakov <akurtako@redhat.com> 2.3.1-1
-- Update to 2.3.1.
-- Keep plexus-container-default on the dependency tree.
-- Drop depmap - not needed now.
-
-* Wed May 19 2010 Alexander Kurtakov <akurtako@redhat.com> 2.3-3
-- Add depmap.
-
-* Wed May 19 2010 Alexander Kurtakov <akurtako@redhat.com> 2.3-2
-- Requires maven-shared-archiver.
-
-* Thu May 13 2010 Alexander Kurtakov <akurtako@redhat.com> 2.3-1
-- Initial package
+%doc LICENSE README.md
